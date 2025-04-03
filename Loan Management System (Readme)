@@ -1,0 +1,159 @@
+Loan Management System (SQL Project)
+
+📌 Project Overview
+
+This project is a SQL-based Loan Management System that processes customer data, income details, loan applications, and credit scores. The system categorizes customers based on income, assigns interest rates, and maintains loan records with automatic triggers and stored procedures for efficient data handling.
+
+🛠 Tech Stack
+
+Database: MySQL
+
+Queries Used: DDL, DML, TCL, Stored Procedures, Triggers
+
+Operations: Data validation, customer segmentation, loan processing, and interest rate calculation
+
+📂 Database Schema & Tables
+
+1️⃣ Customer Income Details (customer_income_status)
+
+Contains customer income data with income classification and interest rate assignment.
+
+CREATE TABLE customer_income_status AS
+SELECT *,
+CASE
+    WHEN applicantincome > 15000 THEN "Grade A"
+    WHEN applicantincome > 9000 THEN "Grade B"
+    WHEN applicantincome > 5000 THEN "Middle class customer"
+    ELSE "Low class"
+END AS Income_criteria,
+CASE
+    WHEN applicantincome < 5000 AND Property_Area = "rural" THEN 3.0
+    WHEN applicantincome < 5000 AND Property_Area = "semirural" THEN 3.5
+    WHEN applicantincome < 5000 AND Property_Area IN ("urban", "semiurban") THEN 5
+    ELSE 7
+END AS interest
+FROM customer_income;
+
+2️⃣ Loan Status (loan_status)
+
+Tracks customer loans, amounts, and credit scores.
+
+CREATE TABLE loan_status (
+    loan_id VARCHAR(50),
+    customer_id VARCHAR(50),
+    loan_amount INT,
+    loan_amount_term INT,
+    cibil_score INT
+);
+
+3️⃣ Triggers
+
+Loan Amount Default Check (loan_amount_check)
+
+Assigns default value if loan amount is NULL.
+
+DELIMITER //
+CREATE TRIGGER loan_amount_check BEFORE INSERT ON loan_status
+FOR EACH ROW
+BEGIN
+    IF NEW.loan_amount IS NULL THEN
+        SET NEW.loan_amount = 0;
+    END IF;
+END //
+DELIMITER ;
+
+CIBIL Score Classification (cibil_grade)
+
+Automatically assigns a CIBIL score category when a loan record is inserted.
+
+DELIMITER //
+CREATE TRIGGER cibil_grade AFTER INSERT ON loan_status
+FOR EACH ROW
+BEGIN
+    IF NEW.cibil_score > 900 THEN
+        INSERT INTO loan_cibil_score_status_details VALUES (NEW.loan_id, NEW.loan_amount, NEW.cibil_score, "High cibil score");
+    ELSEIF NEW.cibil_score > 750 THEN
+        INSERT INTO loan_cibil_score_status_details VALUES (NEW.loan_id, NEW.loan_amount, NEW.cibil_score, "No penalty");
+    ELSEIF NEW.cibil_score > 0 THEN
+        INSERT INTO loan_cibil_score_status_details VALUES (NEW.loan_id, NEW.loan_amount, NEW.cibil_score, "Penalty customers");
+    ELSE
+        INSERT INTO loan_cibil_score_status_details VALUES (NEW.loan_id, NEW.loan_amount, NEW.cibil_score, "Rejected customers (loan cannot apply)");
+    END IF;
+END //
+DELIMITER ;
+
+4️⃣ Stored Procedures
+
+Retrieve All Loan Data (get_all_data)
+
+Combines customer, loan, and region details.
+
+DELIMITER //
+CREATE PROCEDURE get_all_data()
+BEGIN
+    SELECT c.*, d.customer_name, d.gender, d.age, d.married, d.education, d.self_employed,
+           s.postal_code, s.segment, s.state, l.cibil_score_status, r.*
+    FROM customer_interest_analysis c
+    LEFT JOIN customer_det d ON c.loan_id = d.loan_id
+    LEFT JOIN loan_cibil_score_status_details l ON d.loan_id = l.loan_id
+    LEFT JOIN country_state s ON l.loan_id = s.loan_id
+    LEFT JOIN region_info r ON s.region_id = r.region_id;
+END //
+DELIMITER ;
+
+Identify High CIBIL Score Customers (high_cibil_score)
+
+Retrieves customers with excellent credit scores.
+
+DELIMITER //
+CREATE PROCEDURE high_cibil_score()
+BEGIN
+    SELECT c.*, l.cibil_score_status
+    FROM customer_interest_analysis c
+    INNER JOIN loan_cibil_score_status_details l
+    ON c.loan_id = l.loan_id
+    WHERE l.cibil_score > 900;
+END //
+DELIMITER ;
+
+Fetch Home Office & Corporate Segment Customers (home_office_corporate)
+
+DELIMITER //
+CREATE PROCEDURE home_office_corporate()
+BEGIN
+    SELECT c.*, s.customer_name, s.region_id, s.postal_code, s.segment, s.state
+    FROM customer_interest_analysis c
+    INNER JOIN country_state s ON c.loan_id = s.loan_id
+    WHERE segment IN ("home office", "corporate");
+END //
+DELIMITER ;
+
+🏁 How to Run the Project
+
+Clone this repository:
+
+git clone https://github.com/your-username/loan-management-sql.git
+
+Import the Project_1 database into MySQL:
+
+mysql -u root -p < database_script.sql
+
+Execute queries in MySQL Workbench or Command Line.
+
+📊 Expected Output
+
+Customer segmentation based on income levels.
+
+Automatic loan approval/rejection based on credit scores.
+
+Monthly & annual interest calculations.
+
+Easy retrieval of customer and loan details.
+
+🔗 Contributing
+
+Feel free to fork and contribute to improve the project!
+
+📜 License
+
+This project is open-source under the MIT License.
